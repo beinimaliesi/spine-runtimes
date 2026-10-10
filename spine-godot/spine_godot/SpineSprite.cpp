@@ -346,9 +346,6 @@ void SpineMesh2D::update_mesh(const PackedVector2Array &vertices, const PackedVe
 		indices_changed = false;
 	} else {
 		AABB aabb_new;
-		uint8_t color[4] = {uint8_t(CLAMP(colors[0].r * 255.0, 0.0, 255.0)), uint8_t(CLAMP(colors[0].g * 255.0, 0.0, 255.0)),
-							uint8_t(CLAMP(colors[0].b * 255.0, 0.0, 255.0)), uint8_t(CLAMP(colors[0].a * 255.0, 0.0, 255.0))};
-
 		uint8_t *vertex_write_buffer = vertex_buffer.ptrw();
 		uint8_t *attribute_write_buffer = attribute_buffer.ptrw();
 		for (int i = 0; i < vertices.size(); i++) {
@@ -361,6 +358,8 @@ void SpineMesh2D::update_mesh(const PackedVector2Array &vertices, const PackedVe
 			}
 
 			float uv[2] = {(float) uvs[i].x, (float) uvs[i].y};
+			uint8_t color[4] = {uint8_t(CLAMP(colors[i].r * 255.0, 0.0, 255.0)), uint8_t(CLAMP(colors[i].g * 255.0, 0.0, 255.0)),
+							   uint8_t(CLAMP(colors[i].b * 255.0, 0.0, 255.0)), uint8_t(CLAMP(colors[i].a * 255.0, 0.0, 255.0))};
 			memcpy(&vertex_write_buffer[i * vertex_stride + surface_offsets[RS::ARRAY_VERTEX]], &vertex, sizeof(float) * 2);
 			memcpy(&attribute_write_buffer[i * attribute_stride + surface_offsets[RS::ARRAY_COLOR]], color, 4);
 			memcpy(&attribute_write_buffer[i * attribute_stride + surface_offsets[RS::ARRAY_TEX_UV]], uv, 8);
@@ -446,9 +445,12 @@ void SpineMesh2D::update_mesh(const Vector<Point2> &vertices, const Vector<Point
 			}
 
 			float uv[2] = {(float) uvs[i].x, (float) uvs[i].y};
+			Color color = colors[i];
+			uint8_t packed_color[4] = {uint8_t(CLAMP(color.r * 255.0, 0.0, 255.0)), uint8_t(CLAMP(color.g * 255.0, 0.0, 255.0)),
+								   uint8_t(CLAMP(color.b * 255.0, 0.0, 255.0)), uint8_t(CLAMP(color.a * 255.0, 0.0, 255.0))};
 #if VERSION_MAJOR >= 4 && VERSION_MINOR >= 7
 			memcpy(&vertex_write_buffer[i * vertex_stride + surface_offsets[RSE::ARRAY_VERTEX]], &vertex, sizeof(float) * 2);
-			memcpy(&attribute_write_buffer[i * attribute_stride + surface_offsets[RSE::ARRAY_COLOR]], color, 4);
+			memcpy(&attribute_write_buffer[i * attribute_stride + surface_offsets[RSE::ARRAY_COLOR]], packed_color, 4);
 			memcpy(&attribute_write_buffer[i * attribute_stride + surface_offsets[RSE::ARRAY_TEX_UV]], uv, 8);
 #else
 			memcpy(&vertex_write_buffer[i * vertex_stride + surface_offsets[RS::ARRAY_VERTEX]], &vertex, sizeof(float) * 2);
@@ -558,6 +560,10 @@ void SpineSprite::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_time_scale"), &SpineSprite::get_time_scale);
 	ClassDB::bind_method(D_METHOD("set_time_scale", "v"), &SpineSprite::set_time_scale);
+	ClassDB::bind_method(D_METHOD("get_batch_rendering"), &SpineSprite::get_batch_rendering);
+	ClassDB::bind_method(D_METHOD("set_batch_rendering", "enabled"), &SpineSprite::set_batch_rendering);
+	ClassDB::bind_method(D_METHOD("get_render_statistics"), &SpineSprite::get_render_statistics);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "batch_rendering"), "set_batch_rendering", "get_batch_rendering");
 
 	ClassDB::bind_method(D_METHOD("set_debug_root", "v"), &SpineSprite::set_debug_root);
 	ClassDB::bind_method(D_METHOD("get_debug_root"), &SpineSprite::get_debug_root);
@@ -654,7 +660,8 @@ void SpineSprite::_bind_methods() {
 
 SpineSprite::SpineSprite()
 	: update_mode(SpineConstant::UpdateMode_Process), time_scale(1.0), preview_skin("Default"), preview_animation("-- Empty --"),
-	  preview_frame(false), preview_time(0), skeleton_clipper(nullptr) {
+	  preview_frame(false), preview_time(0), batch_rendering(true), active_batches(0), active_vertices(0), active_indices(0),
+	  skeleton_clipper(nullptr) {
 	controller = Ref<SpineController>(memnew(SpineController));
 	controller->set_listener(this);
 	skeleton_clipper = new spine::SkeletonClipping();
@@ -970,7 +977,7 @@ void SpineSprite::update_skeleton(float delta) {
 	Ref<SpineSkeleton> skeleton = controller->get_skeleton();
 	controller->begin_native_operation();
 	sort_slot_nodes();
-	update_meshes(skeleton);
+	update_meshes_dispatch(skeleton);
 	if (controller->end_native_operation()) return;
 #if VERSION_MAJOR > 3
 	queue_redraw();
@@ -982,6 +989,7 @@ void SpineSprite::update_skeleton(float delta) {
 void SpineSprite::update_meshes(Ref<SpineSkeleton> skeleton_ref) {
 	auto statics = SpineSpriteStatics::instance();
 	spine::Skeleton *skeleton = skeleton_ref->get_spine_object();
+	active_batches = active_vertices = active_indices = 0;
 	for (int i = 0, n = (int) skeleton->getSlots().size(); i < n; ++i) {
 		spine::Slot *slot = skeleton->getDrawOrder().getAppliedPose()[i];
 		spine::Attachment *attachment = slot->getAppliedPose().getAttachment();
@@ -1169,10 +1177,307 @@ void SpineSprite::update_meshes(Ref<SpineSkeleton> skeleton_ref) {
 			for (int j = 0; j < (int) num_vertices; j++) {
 				mesh_instance->colors.set(j, vertex_color);
 			}
+
+			// One mesh instance per visible attachment == one draw call in this path.
+			active_batches++;
+			active_vertices += (int) num_vertices;
+			active_indices += (int) indices->size();
 		}
 		skeleton_clipper->clipEnd(*slot);
 	}
 	skeleton_clipper->clipEnd();
+}
+
+Ref<Material> SpineSprite::resolve_slot_material(spine::Slot *slot, spine::BlendMode blend_mode, bool has_dark_color,
+												 bool &out_is_tint_black) {
+	auto statics = SpineSpriteStatics::instance();
+	Ref<Material> custom_material;
+	out_is_tint_black = false;
+
+	// A SpineSlotNode for this slot may override the material.
+	auto &nodes = slot_nodes[slot->getData().getIndex()];
+	if (nodes.size() > 0) {
+		auto slot_node = nodes[0];
+		if (slot_node) {
+			switch (blend_mode) {
+				case spine::BlendMode_Normal:
+					custom_material = slot_node->get_normal_material();
+					break;
+				case spine::BlendMode_Additive:
+					custom_material = slot_node->get_additive_material();
+					break;
+				case spine::BlendMode_Multiply:
+					custom_material = slot_node->get_multiply_material();
+					break;
+				case spine::BlendMode_Screen:
+					custom_material = slot_node->get_screen_material();
+					break;
+			}
+		}
+	}
+
+	// Else, fall back to a material set on the sprite itself.
+	if (!custom_material.is_valid()) {
+		switch (blend_mode) {
+			case spine::BlendMode_Normal:
+				custom_material = normal_material;
+				break;
+			case spine::BlendMode_Additive:
+				custom_material = additive_material;
+				break;
+			case spine::BlendMode_Multiply:
+				custom_material = multiply_material;
+				break;
+			case spine::BlendMode_Screen:
+				custom_material = screen_material;
+				break;
+		}
+	}
+
+#if VERSION_MAJOR > 3 && VERSION_MINOR >= 3
+	if (has_dark_color && !custom_material.is_valid()) {
+		custom_material = statics.tint_black_materials[blend_mode];
+		out_is_tint_black = true;
+	}
+#endif
+
+	if (!custom_material.is_valid()) custom_material = statics.default_materials[blend_mode];
+	return custom_material;
+}
+
+void SpineSprite::update_meshes_batched(Ref<SpineSkeleton> skeleton_ref) {
+	auto statics = SpineSpriteStatics::instance();
+	spine::Skeleton *skeleton = skeleton_ref->get_spine_object();
+	int slot_count = (int) skeleton->getSlots().size();
+
+	active_batches = active_vertices = active_indices = 0;
+
+	// Reset every mesh instance. Only batch leaders get geometry assigned below; followers keep a
+	// null renderer_object so their NOTIFICATION_DRAW becomes a no-op.
+	for (int i = 0; i < mesh_instances.size(); i++) {
+		SpineMesh2D *mesh = mesh_instances[i];
+		mesh->renderer_object = nullptr;
+	}
+
+	SpineMesh2D *batch = nullptr;
+	int batch_vertex_count = 0;
+	SpineRendererObject *batch_renderer_object = nullptr;
+	Ref<Material> batch_material;
+	bool batch_is_tint_black = false;
+	bool batch_has_dark_color = false;
+	Color batch_light_color;
+	Color batch_dark_color;
+#ifdef SPINE_GODOT_EXTENSION
+	PackedInt32Array batch_indices;
+#else
+	Vector<int> batch_indices;
+#endif
+
+	auto flush_batch = [&]() {
+		if (!batch) return;
+		bool changed = batch->indices.size() != batch_indices.size();
+		if (!changed) {
+			for (int j = 0; j < batch_indices.size(); ++j) {
+				if (batch->indices[j] != batch_indices[j]) {
+					changed = true;
+					break;
+				}
+			}
+		}
+		batch->vertices.resize(batch_vertex_count);
+		batch->uvs.resize(batch_vertex_count);
+		batch->colors.resize(batch_vertex_count);
+		batch->indices = batch_indices;
+		batch->indices_changed = changed;
+		batch = nullptr;
+	};
+
+	for (int i = 0; i < slot_count; ++i) {
+		spine::Slot *slot = skeleton->getDrawOrder().getAppliedPose()[i];
+		spine::Attachment *attachment = slot->getAppliedPose().getAttachment();
+
+		bool slot_has_node = slot_nodes[slot->getData().getIndex()].size() > 0;
+		if (!attachment || !slot->getBone().isActive()) {
+			if (slot_has_node) flush_batch();
+			skeleton_clipper->clipEnd(*slot);
+			continue;
+		}
+
+		spine::Color skeleton_color = skeleton->getColor();
+		spine::Color slot_color = slot->getAppliedPose().getColor();
+		bool has_dark_color = false;
+		Color dark_tint;
+#if VERSION_MAJOR > 3 && VERSION_MINOR >= 3
+		has_dark_color = slot->getAppliedPose().hasDarkColor();
+		spine::Color slot_dark_color = slot->getAppliedPose().getDarkColor();
+		dark_tint = Color(skeleton_color.r * slot_dark_color.r, skeleton_color.g * slot_dark_color.g,
+						  skeleton_color.b * slot_dark_color.b);
+#endif
+		spine::Color tint(skeleton_color.r * slot_color.r, skeleton_color.g * slot_color.g, skeleton_color.b * slot_color.b,
+						  skeleton_color.a * slot_color.a);
+
+		SpineRendererObject *renderer_object;
+		spine::Array<float> *vertices = &statics.scratch_vertices;
+		spine::Array<float> *uvs;
+		spine::Array<unsigned short> *indices;
+
+		if (attachment->getRTTI().isExactly(spine::RegionAttachment::rtti)) {
+			auto region = (spine::RegionAttachment *) attachment;
+			auto &sequence = region->getSequence();
+			int sequenceIndex = sequence.resolveIndex(slot->getAppliedPose());
+
+			vertices->setSize(8, 0);
+			region->computeWorldVertices(*slot, sequence.getOffsets(sequenceIndex).buffer(), vertices->buffer(), 0);
+			renderer_object = (SpineRendererObject *) ((spine::AtlasRegion *) sequence.getRegion(sequenceIndex))->getPage()->texture;
+			uvs = &sequence.getUVs(sequenceIndex);
+			indices = &statics.quad_indices;
+
+			auto &attachment_color = region->getColor();
+			tint.r *= attachment_color.r;
+			tint.g *= attachment_color.g;
+			tint.b *= attachment_color.b;
+			tint.a *= attachment_color.a;
+#if VERSION_MAJOR > 3 && VERSION_MINOR >= 3
+			dark_tint.r *= attachment_color.r;
+			dark_tint.g *= attachment_color.g;
+			dark_tint.b *= attachment_color.b;
+#endif
+		} else if (attachment->getRTTI().isExactly(spine::MeshAttachment::rtti)) {
+			auto mesh = (spine::MeshAttachment *) attachment;
+			auto &sequence = mesh->getSequence();
+			int sequenceIndex = sequence.resolveIndex(slot->getAppliedPose());
+
+			vertices->setSize(mesh->getWorldVerticesLength(), 0);
+			mesh->computeWorldVertices(*skeleton, *slot, 0, mesh->getWorldVerticesLength(), vertices->buffer(), 0, 2);
+			renderer_object = (SpineRendererObject *) ((spine::AtlasRegion *) sequence.getRegion(sequenceIndex))->getPage()->texture;
+			uvs = &sequence.getUVs(sequenceIndex);
+			indices = &mesh->getTriangles();
+
+			auto &attachment_color = mesh->getColor();
+			tint.r *= attachment_color.r;
+			tint.g *= attachment_color.g;
+			tint.b *= attachment_color.b;
+			tint.a *= attachment_color.a;
+#if VERSION_MAJOR > 3 && VERSION_MINOR >= 3
+			dark_tint.r *= attachment_color.r;
+			dark_tint.g *= attachment_color.g;
+			dark_tint.b *= attachment_color.b;
+#endif
+		} else if (attachment->getRTTI().isExactly(spine::ClippingAttachment::rtti)) {
+			auto clip = (spine::ClippingAttachment *) attachment;
+			skeleton_clipper->clipStart(*skeleton, *slot, clip);
+			continue;
+		} else {
+			skeleton_clipper->clipEnd(*slot);
+			continue;
+		}
+
+		if (skeleton_clipper->isClipping()) {
+			skeleton_clipper->clipTriangles(*vertices, *indices, *uvs, 2);
+			if (skeleton_clipper->getClippedTriangles().size() == 0) {
+				skeleton_clipper->clipEnd(*slot);
+				continue;
+			}
+			vertices = &skeleton_clipper->getClippedVertices();
+			uvs = &skeleton_clipper->getClippedUVs();
+			indices = &skeleton_clipper->getClippedTriangles();
+		}
+
+		if (indices->size() > 0) {
+			spine::BlendMode blend_mode = slot->getData().getBlendMode();
+			bool is_tint_black = false;
+			Ref<Material> material = resolve_slot_material(slot, blend_mode, has_dark_color, is_tint_black);
+
+			// A SpineSlotNode is synchronized after this slot, so it cuts the batch after
+			// the current attachment rather than before it.
+			Color light_tint(tint.r, tint.g, tint.b, tint.a);
+
+			bool needs_new_batch = !batch ||
+								   batch_renderer_object != renderer_object ||
+								   batch_material != material ||
+								   batch_is_tint_black != is_tint_black;
+#if VERSION_MAJOR > 3 && VERSION_MINOR >= 3
+			// SpineMesh2D stores tint-black attributes per mesh, rather than per vertex. Keep
+			// those values uniform inside a batch; regular vertex colors remain per-vertex.
+			if (batch_has_dark_color != has_dark_color ||
+					(has_dark_color && (batch_light_color != light_tint || batch_dark_color != dark_tint)))
+				needs_new_batch = true;
+#endif
+
+			if (needs_new_batch) {
+				// Flush the previous batch. Only mark the mesh topology dirty when the merged
+				// index sequence actually changed; vertex/color data remains dynamic.
+				flush_batch();
+				batch = mesh_instances[i];
+				batch_vertex_count = 0;
+				batch_renderer_object = renderer_object;
+				batch_material = material;
+				batch_is_tint_black = is_tint_black;
+#if VERSION_MAJOR > 3 && VERSION_MINOR >= 3
+				batch_has_dark_color = has_dark_color;
+				batch_light_color = light_tint;
+				batch_dark_color = dark_tint;
+#endif
+				batch_indices.resize(0);
+				batch->renderer_object = renderer_object;
+				batch->set_light_mask(get_light_mask());
+				batch->set_material(material);
+#if VERSION_MAJOR > 3 && VERSION_MINOR >= 3
+				batch->has_dark_color = has_dark_color;
+				batch->light_color = Color(tint.r, tint.g, tint.b, tint.a);
+				batch->dark_color = dark_tint;
+#endif
+				active_batches++;
+			}
+
+			Color vertex_color(tint.r, tint.g, tint.b, tint.a);
+#if VERSION_MAJOR > 3 && VERSION_MINOR >= 3
+			if (is_tint_black) {
+				// The tint-black material reads Spine's colors from the custom attribute buffer, so
+				// COLOR itself must stay white (see the non-batched path for the rationale).
+				vertex_color = Color(1, 1, 1, 1);
+			}
+#endif
+
+			int base_vertex = batch_vertex_count;
+			int vertex_count = (int) vertices->size() / 2;
+
+			batch->vertices.resize(base_vertex + vertex_count);
+			memcpy(batch->vertices.ptrw() + base_vertex, vertices->buffer(), vertex_count * 2 * sizeof(float));
+			batch->uvs.resize(base_vertex + vertex_count);
+			memcpy(batch->uvs.ptrw() + base_vertex, uvs->buffer(), vertex_count * 2 * sizeof(float));
+			batch->colors.resize(base_vertex + vertex_count);
+			for (int j = 0; j < vertex_count; j++) {
+				batch->colors.set(base_vertex + j, vertex_color);
+			}
+			batch_vertex_count += vertex_count;
+
+			// Offset this attachment's indices so draw order inside the merged mesh is preserved.
+			int index_base = batch_indices.size();
+			batch_indices.resize(index_base + (int) indices->size());
+			for (int j = 0; j < (int) indices->size(); ++j) {
+				batch_indices.set(index_base + j, base_vertex + (int) indices->buffer()[j]);
+			}
+
+			active_vertices += vertex_count;
+			active_indices += (int) indices->size();
+		}
+		skeleton_clipper->clipEnd(*slot);
+		if (slot_nodes[slot->getData().getIndex()].size() > 0) flush_batch();
+	}
+	skeleton_clipper->clipEnd();
+
+	// Flush the final batch.
+	flush_batch();
+
+	// The active batch count is sufficient for statistics; inactive follower meshes have no renderer object.
+}
+
+void SpineSprite::update_meshes_dispatch(Ref<SpineSkeleton> skeleton_ref) {
+	if (batch_rendering)
+		update_meshes_batched(skeleton_ref);
+	else
+		update_meshes(skeleton_ref);
 }
 
 #ifdef SPINE_GODOT_EXTENSION
@@ -1650,6 +1955,47 @@ void SpineSprite::set_time_scale(float time_scale) {
 
 float SpineSprite::get_time_scale() {
 	return time_scale;
+}
+
+void SpineSprite::set_batch_rendering(bool enabled) {
+	if (batch_rendering == enabled) return;
+	batch_rendering = enabled;
+	// Geometry layout differs between the two paths, so rebuild from scratch.
+	Ref<SpineSkeleton> skeleton = controller->get_skeleton();
+	if (skeleton.is_valid() && skeleton->get_spine_object()) {
+		for (int i = 0; i < mesh_instances.size(); i++) {
+			SpineMesh2D *mesh = mesh_instances[i];
+			mesh->renderer_object = nullptr;
+			mesh->vertices.resize(0);
+			mesh->uvs.resize(0);
+			mesh->colors.resize(0);
+			mesh->indices.resize(0);
+			mesh->indices_changed = true;
+		}
+		controller->begin_native_operation();
+		sort_slot_nodes();
+		update_meshes_dispatch(skeleton);
+		controller->end_native_operation();
+#if VERSION_MAJOR > 3
+		queue_redraw();
+#else
+		update();
+#endif
+	}
+}
+
+bool SpineSprite::get_batch_rendering() const {
+	return batch_rendering;
+}
+
+Dictionary SpineSprite::get_render_statistics() const {
+	Dictionary result;
+	result["batch_rendering"] = batch_rendering;
+	result["batches"] = active_batches;
+	result["vertices"] = active_vertices;
+	result["indices"] = active_indices;
+	result["mesh_instances"] = mesh_instances.size();
+	return result;
 }
 
 #ifndef SPINE_GODOT_EXTENSION

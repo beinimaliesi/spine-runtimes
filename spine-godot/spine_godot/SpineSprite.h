@@ -185,6 +185,10 @@ protected:
 
 	spine::Array<spine::Array<SpineSlotNode *>> slot_nodes;
 	Vector<SpineMesh2D *> mesh_instances;
+	bool batch_rendering;
+	int active_batches;
+	int active_vertices;
+	int active_indices;
 	Ref<Font> debug_font;
 	Ref<Material> normal_material;
 	Ref<Material> additive_material;
@@ -202,6 +206,12 @@ protected:
 	void remove_meshes();
 	void sort_slot_nodes();
 	void update_meshes(Ref<SpineSkeleton> skeleton_ref);
+	// Merges consecutive slots that share texture, material and tint-black state into a
+	// single SpineMesh2D, so the whole skeleton can be drawn in as few draw calls as
+	// possible. Mirrors the batching SpineSprite3D already does for the 3D path.
+	void update_meshes_batched(Ref<SpineSkeleton> skeleton_ref);
+	void update_meshes_dispatch(Ref<SpineSkeleton> skeleton_ref);
+	Ref<Material> resolve_slot_material(spine::Slot *slot, spine::BlendMode blend_mode, bool has_dark_color, bool &out_is_tint_black);
 	void draw();
 	void draw_bone(spine::Bone *bone, const Color &color);
 	SpineController *get_spine_controller() {
@@ -269,6 +279,12 @@ public:
 	void set_time_scale(float time_scale);
 
 	float get_time_scale();
+
+	void set_batch_rendering(bool enabled);
+
+	bool get_batch_rendering() const;
+
+	Dictionary get_render_statistics() const;
 
 	bool get_debug_root() {
 		return debug_root;
