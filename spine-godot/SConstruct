@@ -16,7 +16,7 @@ def validate_parent_dir(key, val, env):
 
 
 libname = "spine_godot"
-projectdir = "example-v4-extension/addons/godot_lottie"
+projectdir = "example-v4-extension/addons/godot_spine"
 
 localEnv = Environment(tools=["default"], PLATFORM="")
 

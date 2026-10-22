@@ -46,7 +46,7 @@ cd ../..
 
 该脚本会克隆 `godot-cpp/master`，复制 `spine-cpp` 到 `spine-godot/spine_godot/spine-cpp`，并准备示例工程的扩展配置。`false` 表示不下载和编译 Godot 编辑器。
 
-**不要在日常增量编译前重复执行 setup。** 它会删除并重建 `spine-godot/godot-cpp`、`spine-godot/spine_godot/spine-cpp` 和 `spine-godot/example-v4-extension/addons/godot_lottie/bin`。
+**不要在日常增量编译前重复执行 setup。** 它会删除并重建 `spine-godot/godot-cpp`、`spine-godot/spine_godot/spine-cpp` 和 `spine-godot/example-v4-extension/addons/godot_spine/bin`。
 
 ### macOS 本地开发
 
@@ -75,7 +75,7 @@ GODOT_CPP_API_VERSION=4.7 bash spine-godot/build/build-extension.sh macos
 产物自动复制到：
 
 ```text
-spine-godot/example-v4-extension/addons/godot_lottie/
+spine-godot/example-v4-extension/addons/godot_spine/
 ├── spine_godot_extension.gdextension
 └── bin/
     └── macos/
@@ -107,7 +107,7 @@ GODOT_CPP_API_VERSION=4.7 \
 bash spine-godot/build/build-extension.sh android arm64
 ```
 
-平台产物位于 `spine-godot/example-v4-extension/addons/godot_lottie/bin/<平台>/`。桌面平台构建 editor/debug/release；iOS、Android 构建 debug/release；Web 额外构建 threads 和 nothreads 两种变体。
+平台产物位于 `spine-godot/example-v4-extension/addons/godot_spine/bin/<平台>/`。桌面平台构建 editor/debug/release；iOS、Android 构建 debug/release；Web 额外构建 threads 和 nothreads 两种变体。
 
 ### 加载验证与集成
 
@@ -123,10 +123,10 @@ bash spine-godot/build/build-extension.sh android arm64
 
 检查退出码以及日志中的 GDExtension 加载错误、缺失符号和脚本错误。headless 加载只能验证导入和加载，不能验证批处理后的画面；还需打开示例场景检查颜色、裁剪和 SlotNode 遮挡顺序。
 
-集成到业务工程时，将整个 `addons/godot_lottie` 目录复制到项目的 `res://addons/godot_lottie`，可只保留需要的平台产物。例如：
+集成到业务工程时，将整个 `addons/godot_spine` 目录复制到项目的 `res://addons/godot_spine`，可只保留需要的平台产物。例如：
 
 ```text
-业务工程/addons/godot_lottie/
+业务工程/addons/godot_spine/
 ├── spine_godot_extension.gdextension
 └── bin/
     ├── android/
@@ -137,7 +137,7 @@ bash spine-godot/build/build-extension.sh android arm64
     └── windows/
 ```
 
-`.gdextension` 中的库路径固定为 `res://addons/godot_lottie/bin/<平台>/...`，因此必须安装到项目的 `addons/godot_lottie` 目录。Godot 会自动发现并加载 GDExtension，无需额外添加 `plugin.cfg`。保持目录结构不变，并确保库的架构与运行 Godot 的进程一致。Linux 产物同样放在 `bin/linux/`。
+`.gdextension` 中的库路径固定为 `res://addons/godot_spine/bin/<平台>/...`，因此必须安装到项目的 `addons/godot_spine` 目录。Godot 会自动发现并加载 GDExtension，无需额外添加 `plugin.cfg`。保持目录结构不变，并确保库的架构与运行 Godot 的进程一致。Linux 产物同样放在 `bin/linux/`。
 
 ### 参考
 
@@ -169,6 +169,6 @@ bash spine-godot/build/build-extension.sh android arm64
 
 入口为 [spine-godot-extension-v4-all.yml](../.github/workflows/spine-godot-extension-v4-all.yml)，具体构建步骤在 [spine-godot-extension-v4.yml](../.github/workflows/spine-godot-extension-v4.yml)。当前会构建 Windows、Linux x86_64、macOS、iOS、Android 和 Web；Artifacts 保留时间配置为 1 天。
 
-单平台 Artifact 主要包含编译产物：解压到 `res://addons/godot_lottie/bin/<平台>/`，并将仓库中的 `spine-godot/spine_godot_extension.gdextension` 复制到 `res://addons/godot_lottie/`。工作流的 S3 汇总压缩包则直接包含 `addons/godot_lottie/` 目录结构。
+单平台 Artifact 主要包含编译产物：解压到 `res://addons/godot_spine/bin/<平台>/`，并将仓库中的 `spine-godot/spine_godot_extension.gdextension` 复制到 `res://addons/godot_spine/`。工作流的 S3 汇总压缩包则直接包含 `addons/godot_spine/` 目录结构。
 
 下载后，按第一章的“加载验证与集成”步骤检查扩展加载和画面效果。

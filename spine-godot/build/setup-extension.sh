@@ -60,7 +60,7 @@ pushd ..
 rm -rf godot-cpp
 git clone --depth 1 $godot_cpp_repo -b $godot_cpp_branch
 
-addon_dir="example-v4-extension/addons/godot_lottie"
+addon_dir="example-v4-extension/addons/godot_spine"
 rm -rf "$addon_dir/bin"
 mkdir -p "$addon_dir/bin"
 

@@ -51,7 +51,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gdextension-windows-${{ env.GODOT_TAG }}
-          path: spine-godot/example-v4-extension/addons/godot_lottie/bin/windows/*.dll
+          path: spine-godot/example-v4-extension/addons/godot_spine/bin/windows/*.dll
           retention-days: 1
 
   build-linux-x86_64:
@@ -79,7 +79,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gdextension-linux-x86_64-${{ env.GODOT_TAG }}
-          path: spine-godot/example-v4-extension/addons/godot_lottie/bin/linux/*.so
+          path: spine-godot/example-v4-extension/addons/godot_spine/bin/linux/*.so
           retention-days: 1
 
   build-macos:
@@ -102,7 +102,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gdextension-macos-${{ env.GODOT_TAG }}
-          path: spine-godot/example-v4-extension/addons/godot_lottie/bin/macos/**/*
+          path: spine-godot/example-v4-extension/addons/godot_spine/bin/macos/**/*
           retention-days: 1
 
   build-ios:
@@ -125,7 +125,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gdextension-ios-${{ env.GODOT_TAG }}
-          path: spine-godot/example-v4-extension/addons/godot_lottie/bin/ios/**/*
+          path: spine-godot/example-v4-extension/addons/godot_spine/bin/ios/**/*
           retention-days: 1
 
   build-android:
@@ -169,7 +169,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gdextension-android-${{ env.GODOT_TAG }}
-          path: spine-godot/example-v4-extension/addons/godot_lottie/bin/android/*.so
+          path: spine-godot/example-v4-extension/addons/godot_spine/bin/android/*.so
           retention-days: 1
 
   build-web:
@@ -197,7 +197,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gdextension-web-${{ env.GODOT_TAG }}
-          path: spine-godot/example-v4-extension/addons/godot_lottie/bin/web/*.wasm
+          path: spine-godot/example-v4-extension/addons/godot_spine/bin/web/*.wasm
           retention-days: 1
 
   upload-to-s3:
@@ -255,7 +255,7 @@ jobs:
           cd artifacts
 
           # Create directories matching the expected structure
-          addon_dir="addons/godot_lottie"
+          addon_dir="addons/godot_spine"
           mkdir -p "$addon_dir"/bin/{windows,linux,macos,ios,android,web}
 
           # Place the extension descriptor at the addon root

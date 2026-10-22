@@ -63,7 +63,7 @@ echo "CPUS: $cpus"
 pushd ..
 
 if [ "$raw_platform" == "web" ]; then
-    BINDIR="example-v4-extension/addons/godot_lottie/bin/web"
+    BINDIR="example-v4-extension/addons/godot_spine/bin/web"
     mkdir -p $BINDIR
 
     # Build threaded versions
