@@ -60,8 +60,9 @@ pushd ..
 rm -rf godot-cpp
 git clone --depth 1 $godot_cpp_repo -b $godot_cpp_branch
 
-rm -rf example-v4-extension/bin
-mkdir -p example-v4-extension/bin
+addon_dir="example-v4-extension/addons/godot_lottie"
+rm -rf "$addon_dir/bin"
+mkdir -p "$addon_dir/bin"
 
 if [ $dev == "true" ]; then
     echo "Dev build, creating godot-cpp/dev"
@@ -73,7 +74,7 @@ if [ $dev == "true" ]; then
     popd
 fi
 
-cp spine_godot_extension.gdextension example-v4-extension/bin
+cp spine_godot_extension.gdextension "$addon_dir/"
 rm -rf spine_godot/spine-cpp
 cp -r ../spine-cpp spine_godot
 

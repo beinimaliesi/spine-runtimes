@@ -203,6 +203,9 @@ spine-godot/.idea
 spine-godot/build/version.txt
 spine-godot/vc140.pdb
 spine-godot/example-v4-extension/bin
+spine-godot/example-v4-extension/addons/godot_lottie/bin/
+spine-godot/example-v4-extension/addons/godot_lottie/spine_godot_extension.gdextension
+spine-godot/example-v4-extension/addons/godot_lottie/spine_godot_extension.gdextension.uid
 spine-godot/example-v4-extension/MoltenVK.xcframework
 spine-flutter/example/android/app/.cxx
 CLAUDE.md

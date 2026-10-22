@@ -2,7 +2,7 @@
 set -eu
 
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
-	echo "Usage: $0 /absolute/path/to/godot [extension-example/bin]" >&2
+	echo "Usage: $0 /absolute/path/to/godot [extension-example/addons/godot_lottie]" >&2
 	exit 1
 fi
 
@@ -22,6 +22,6 @@ printf '%s\n' '[plugin]' 'name="Spine editor picking regression"' \
 	'description="Temporary editor selection regression"' 'author="Spine"' \
 	'version="1.0"' 'script="editor-picking-3d.gd"' >"$project/addons/picking/plugin.cfg"
 if [ "$#" = 2 ]; then
-	cp -R "$2" "$project/bin"
+	cp -R "$2" "$project/addons/godot_lottie"
 fi
 "$godot" --editor --path "$project" res://picking.tscn

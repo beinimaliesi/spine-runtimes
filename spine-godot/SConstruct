@@ -16,7 +16,7 @@ def validate_parent_dir(key, val, env):
 
 
 libname = "spine_godot"
-projectdir = "example-v4-extension"
+projectdir = "example-v4-extension/addons/godot_lottie"
 
 localEnv = Environment(tools=["default"], PLATFORM="")
 
@@ -173,7 +173,11 @@ if env["platform"] == "macos" or env["platform"] == "ios":
     env.Depends(library, plist)
 
 copy = env.InstallAs("{}/{}".format(projectdir, libraryfile), library)
-default_args = [library, copy]
+extension_config = env.InstallAs(
+    "{}/spine_godot_extension.gdextension".format(projectdir),
+    "spine_godot_extension.gdextension",
+)
+default_args = [library, copy, extension_config]
 
 if env["platform"] == "macos" or env["platform"] == "ios":
     copy_plist = env.InstallAs("{}/{}".format(projectdir, plist_file), plist_file)

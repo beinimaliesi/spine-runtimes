@@ -60,7 +60,7 @@ The test waits for multiple `RenderingServer.frame_post_draw` signals after each
   --script "$(pwd)/spine-godot/tests/animation-player.gd"
 bash spine-godot/tests/editor-animation-player.sh /absolute/path/to/module-godot
 bash spine-godot/tests/editor-animation-player.sh /absolute/path/to/vanilla-godot \
-  "$(pwd)/spine-godot/example-v4-extension/bin"
+  "$(pwd)/spine-godot/example-v4-extension/addons/godot_lottie"
 ```
 
 The editor launcher creates a disposable project and exits its test editor automatically. Do not enable the test plugin in a working project. Require the runtime/editor `Spine AnimationPlayer ... regression passed.` marker and no script/runtime errors.
@@ -121,7 +121,7 @@ Repeat for Mobile and Forward+. Require `Spine interactive benchmark regression 
 ```sh
 bash spine-godot/tests/editor-picking-3d.sh /absolute/path/to/module-godot
 bash spine-godot/tests/editor-picking-3d.sh /absolute/path/to/vanilla-godot \
-  "$(pwd)/spine-godot/example-v4-extension/bin"
+  "$(pwd)/spine-godot/example-v4-extension/addons/godot_lottie"
 ```
 
 Use an editor build with a graphical session. Check for `Spine 3D editor picking regression passed.` and no errors. Picking follows attachment triangles, like Godot's mesh gizmos, rather than individual texture-alpha pixels or custom vertex-shader displacement. The picking mesh is editor-only and cached until geometry changes; it does not add runtime draw calls.
